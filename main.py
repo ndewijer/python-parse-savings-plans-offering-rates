@@ -23,10 +23,10 @@ awsfilter = [
 ]
 
 session = boto3.Session(profile_name='')
-awssp = session.client('savingsplans')
 
 
-def pulldata():
+def pulldata_savingsplan():
+    awssp = session.client('savingsplans')
 
     data = awssp.describe_savings_plans_offering_rates(
         products=['EC2'],
@@ -38,7 +38,7 @@ def pulldata():
     # for page in page_iterator:
     for result in data['searchResults']:
 
-        resultArray.append(parsedata(result))
+        resultArray.append(parsedata_savingsplan(result))
 
     if data['nextToken'] != '':
         nextToken = data['nextToken']
@@ -53,7 +53,7 @@ def pulldata():
         )
         for result in followup_data['searchResults']:
 
-            resultArray.append(parsedata(result))
+            resultArray.append(parsedata_savingsplan(result))
 
         if followup_data['nextToken'] != '':
             nextToken = followup_data['nextToken']
@@ -67,10 +67,10 @@ def pulldata():
         df = pd.DataFrame(data['searchResults'])
         df.to_csv("results/searchResults.csv", index=False)
 
-        return resultArray
+        return split_merge_savingsplan(resultArray)
 
 
-def parsedata(result):
+def parsedata_savingsplan(result):
     valueDict = OrderedDict()
 
     duration = round(result['savingsPlanOffering']
@@ -80,22 +80,77 @@ def parsedata(result):
         item for item in result['properties'] if item["name"] == "instanceType")['value']
     valueDict['OS'] = next(item for item in result['properties']
                            if item["name"] == "productDescription")['value']
-    valueDict['ondemand_rate'] = result['rate']
-    valueDict['ondemand_unit'] = result['unit']
+    valueDict['rate'] = result['rate']
+    valueDict['unit'] = result['unit']
     valueDict['currency'] = result['savingsPlanOffering']['currency']
     valueDict['payplan'] = result['savingsPlanOffering']['planType']
     valueDict['paymentOption'] = result['savingsPlanOffering']['paymentOption']
-    valueDict['OptionDuration {0} year'.format(duration)] = duration
+    valueDict['OptionDuration'] = duration
     # valueDict['OptionDescription'] = result['savingsPlanOffering']['planDescription']
 
     return valueDict
 
 
+def split_merge_savingsplan(data):
+    oneyearArray = []
+    threeyearArray = []
+
+    for record in data:
+        if record["OptionDuration"] == 1:
+            record.pop("OptionDuration")
+            record["rate/h 1y"] = record.pop("rate")
+            oneyearArray.append(record)
+        elif record["OptionDuration"] == 3:
+            record.pop("OptionDuration")
+            record["rate/h 3y"] = record.pop("rate")
+            threeyearArray.append(record)
+
+    oneyr_df = pd.DataFrame(oneyearArray)
+    threeyr_df = pd.DataFrame(threeyearArray)
+
+    result = pd.merge(oneyr_df, threeyr_df, on=[
+                      "instanceType", "OS", "paymentOption", "payplan", "unit", "currency"], how="outer")
+    result = result.drop_duplicates()
+    return result
+
+
+def add_ondemand():
+    awsod = session.client('pricing', region_name="us-east-1")
+
+    od_data = awsod.get_products(
+        ServiceCode="AmazonEC2",
+        Filters=[
+            {
+                "Type": "TERM_MATCH",
+                "Field": "ServiceCode",
+                "Value": "AmazonEC2"
+            },
+            {
+                "Type": "TERM_MATCH",
+                "Field": "operation",
+                "Value": "RunInstances:0002"
+            },
+            {
+                "Type": "TERM_MATCH",
+                "Field": "regionCode",
+                "Value": "eu-central-1"
+            },
+            {
+                "Type": "TERM_MATCH",
+                "Field": "tenancy",
+                "Value": "shared"
+            },
+        ]
+    )
+    print(od_data)
+
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    data = pulldata()
+    sp_data = pulldata_savingsplan()
+    # all_data = add_ondemand()
 
-    df = pd.DataFrame(data)
-    df.to_csv("results/data.csv", index=False)
+    df = pd.DataFrame(sp_data)
+    df.to_csv("results/sp_data.csv", index=False)
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
