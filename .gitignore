@@ -1,0 +1,52 @@
+#  Local .terraform directories
+**/.terraform/*
+**/.terraform.lock.hcl
+
+# .bak files
+*.bak
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+*.tfvars
+
+# .zip files
+*.zip
+
+#  Local .idea directories
+!.idea/runConfigurations/*
+**/.idea/*
+
+#  Local .DS_Store directories
+*.DS_Store
+
+# Python Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+#  Local VS code settings directories
+**/.vscode/*
+
+# Results Folder
+**/results/*
